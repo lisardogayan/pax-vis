@@ -1,0 +1,241 @@
+---
+title: 'PEC 3: Peace Agreements'
+author: "Lisardo GayÃ¡n Tremps"
+date: "06/12/2019"
+output:
+  pdf_document:
+    highlight: default
+    number_sections: no
+    toc: yes
+    toc_depth: 3
+    latex_engine: xelatex
+  html_document:
+    highlight: default
+    number_sections: no
+    theme: cosmo
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '3'
+params:
+  confidence:
+    input: slider
+    label: 'Nivel de confianza:'
+    max: 0.99
+    min: 0.8
+    sep: ''
+    step: 0.01
+    value: 0.9
+  defconf:
+    input: slider
+    label: 'Nivel de confianza por defecto:'
+    max: 0.99
+    min: 0.8
+    sep: ''
+    step: 0.01
+    value: 0.95
+geometry: margin=1in
+bibliography: biblio.bib
+nocite: '@*'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_libraries, include=FALSE, eval = TRUE}
+library(knitr)
+library(kableExtra)
+library(colorspace)
+library(stringr)
+library(data.table)
+library(psych)
+library(ggpubr)
+library(VIM)
+#library(lettercase)
+
+```
+# 1. Introducción
+
+Los datos que se analizan en este informe corresponden a los datos de los acuerdos de paz disponibles en http://www.peaceagrements.org en especial los que se proporcionan en el fichero  https://www.peaceagreements.org/files/pax_all_agreements_data.csv de la web. 
+
+El archivo consta de 1789 registros con 266 variables detalladas en https://www.peaceagreements.org/files/PA_X_codebook_Version2_June_2019.pdf
+
+
+# 2. Análisis descriptivo.
+
+
+## 2.1. Carga de los datos.
+
+Cargo el archivo de datos 'pax_all_agreements_data.csv'. Una vez cargado el archivo, compruebo el tipo de datos de los mismos.
+
+
+Primero, inspecciono el tipo de formato .csv que tiene el archivo.
+
+```{r,eval=TRUE,echo=TRUE}
+# Método alternativo para inspeccionar el archivo.
+#fileName <- "rawData.csv"
+#conn <- file(fileName, open = "r")
+#lines <- readLines(conn)
+#head(lines)
+#close(conn)
+#Inspecciono el archivo
+filecheck <- readLines("pax_all_agreements_data.csv") 
+# Muestro la cabecera
+#print(filecheck[0:4])
+#head(filecheck,4)
+# Muestro la cabecera formateada con kable
+kable(head(filecheck), caption = 'Primeras lineas del archivo $pax_all_agreements_data.csv$') %>%
+  kable_styling("condensed", full_width = F, position = "left") %>%
+  #Para quitar una x que toma por defecto como nombre de columna
+  row_spec(0, color = "white") 
+```
+
+
+Se observa como el fichero está separado por comas "," y el delimitador de decimales es el punto.
+
+Procedo a leer el archivo en un dataframe y muestro las primeras líneas.
+
+```{r,eval=TRUE,echo=TRUE}
+# Leo el archivo en el dataframe peace
+peace <- read.csv("pax_all_agreements_data.csv", sep=",",na.strings = "NA")  
+# Muestro las primeras líneas formateadas con kable
+kable(head(peace)) %>% 
+  #kable_styling(bootstrap_options = c("striped", "hover", 
+  #                                    "bordered", condensed", "responsive")) 
+  kable_styling("condensed", full_width = F, position = "left") 
+```
+
+
+Muestro el número de registros, el número de variables y el nombre de las variables.
+```{r,eval=TRUE,echo=TRUE}
+#Número de registros 
+nrow(peace)
+#Número de variables
+ncol(peace)
+#Nombre de las variables
+colnames(peace)
+```
+
+Cambio los nombres de las variables.
+```{r,eval=TRUE,echo=TRUE}
+# Muestro la estructura del dataframe
+names(peace)[1] <- "Country"
+names(peace)[2] <- "Conflict_type"
+names(peace)[3] <- "Peace_Process_Number"
+names(peace)[4] <- "Peace Process_name"
+names(peace)[5] <- "Region"
+names(peace)[6] <- "Agreement_Id"
+names(peace)[7] <- "Agreement_Name"
+names(peace)[8] <- "Date_Signed"
+names(peace)[9] <- "Agreement_Definition_and_Status"
+names(peace)[10] <- "Agrmnt_length_pages"
+names(peace)[11] <- "Agrmnt_length_characters"
+names(peace)[12] <- "Agrmnt_Conflict_Type"
+names(peace)[13] <- "Agreement_Stage"
+names(peace)[14] <- "Sub_stage"
+names(peace)[15] <- "Parties"
+names(peace)[16] <- "Third_Party"
+names(peace)[17] <- "Other_Agreement"
+#names(peace)[18] <- "LOC1ISO"
+#names(peace)[19] <- "LOC2ISO"
+#names(peace)[20] <- "Loc1GWNO"
+#names(peace)[21] <- "Loc2GWNO"
+names(peace)[22] <- "Uppsala_Conflict_Data_Program_Conflict_ID"
+names(peace)[23] <- "Uppsala_Conflict_Data_Program_Peace_Agreement"
+names(peace)[24] <- "Peace_Accord_Matrix_Agrmnt"
+names(peace)[25] <- "Correlates_War"
+```
+
+Los vuelvo a mostrar
+
+```{r,eval=TRUE,echo=TRUE}
+#Nombre de las variables
+colnames(peace)
+```
+Se han cargado por tanto las 266 variables y 1789 registros que comentaba el enunciado. Valido el tipo de datos que se han leido.
+
+Muestro el tipo de cada variable.
+```{r,eval=TRUE,echo=TRUE}
+# Muestro la estructura del dataframe
+str(peace, list.len=ncol(peace))
+```
+
+
+```{r,eval=TRUE,echo=TRUE}
+# Muestro el tipo de cada variable formateado con kable
+vartypes <- data.table(variable = colnames(peace), clase = sapply(peace, class))
+kable(vartypes, caption = "Asignación de clase de objeto R a cada variable") %>%
+  kable_styling("striped", full_width = T)
+```
+
+Se observa como a partir de la columna "GCh", todas las columnas se han leido como "integer", pero deberia ser "factor", al tratarse de una variable categórica binaria. Procedo a corregirlo.
+
+```{r,eval=TRUE,echo=TRUE}
+# Hallo el número de columna de la variable GCh
+which(colnames(peace)=="GCh")
+```
+
+```{r,eval=TRUE,echo=TRUE}
+# Corrijo los tipos de las variable de peace desde la columna 26
+
+for (i in 26:ncol(peace)) {
+  if (class(peace[,i]) == "integer") {
+      peace[,i]<- as.factor(peace[,i])
+  }
+}
+str(peace, list.len=ncol(peace))
+```
+
+Vuelvo a mostrar la tabla con los objetos de R corregidos
+
+```{r,eval=TRUE,echo=TRUE}
+# Muestro el tipo de cada variable formateado con kable
+vartypes <- data.table(variable = colnames(peace), clase = sapply(peace, class))
+kable(vartypes, caption = "Asignación de clase de objeto R a cada variable") %>%
+  kable_styling("striped", full_width = T)
+```
+
+Compruebo que no hay valores nulos.
+
+```{r,eval=TRUE,echo=TRUE}
+# Busco primero qué variables tienen valores perdidos
+sapply(peace, function(x) sum(is.na(x)))
+```
+
+## 2.2 Análisis descriptivo visual
+
+Represento gráficamente las variables del conjunto de datos para poder visualizar la distribución de valores de las variables.
+
+Para las variables categóricas o cualitativas elijo un boxplot, para las cuantitativas un histograma.
+
+```{r,eval=TRUE,echo=TRUE}
+# Muestro un histograma para cada variable cuantitativa o un gráfico de barras en caso de que
+# sea una variable cualitativa.
+for (i in 1:ncol(peace)) {
+  if (class(peace[,i]) != "factor") {
+    hist(peace[,i], freq = TRUE, col = c("green"), 
+         main=paste("Distribución de ", 
+                    str_to_title(str_replace(colnames(peace[i]), "_", " ")), sep = " "),
+         xlab= str_to_title(str_replace(colnames(peace[i]), "_", " ")))
+  }
+  else {
+    barplot(table(peace[,i]),
+            col = c("orange","yellow","blue","red"),
+            main=paste("Distribución de ", 
+                    str_to_title(str_replace(colnames(peace[i]), "_", " ")), sep = " "),
+            xlab= str_to_title(str_replace(colnames(peace[i]), "_", " ")))
+  }
+}
+```
+
+
+
+
+
+
+
+
+  
